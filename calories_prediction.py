@@ -12,6 +12,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import numpy as np
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+# scikit learn regression does not provide the regression table
+import statsmodels.api as sm
 
 # Define file paths
 train_path = 'inputs/train.csv'
@@ -78,7 +81,7 @@ for col in missing_cols:
 test_encoded = test_encoded[train_encoded.drop(['Calories'], axis=1).columns]
 
 # Prepare data
-X = train_encoded.drop(['id', 'Calories'], axis=1)
+X = train_encoded.drop(['id', 'Calories','Height'], axis=1)
 y = train_encoded['Calories']
 
 # Train-test split
@@ -96,3 +99,40 @@ print("MAE:", mean_absolute_error(y_val, y_pred))
 
 # Optional: Predict on test set (if needed)
 # test_predictions = model.predict(test_encoded.drop('id', axis=1))
+
+#%%
+# statsmodel regresion
+X['Sex_male'] = X['Sex_male'].astype(int)
+
+X_with_const = sm.add_constant(X)
+model_sm = sm.OLS(y, X_with_const).fit()
+print(model_sm.summary())
+
+#%%
+sns.histplot(train_encoded['Body_Temp'], kde=True)
+plt.title('Distribution of Body Temperature')
+plt.show()
+
+print(train_encoded['Body_Temp'].describe())
+
+#%%
+sns.scatterplot(x='Body_Temp', y='Calories', data=train_encoded)
+plt.title('Calories vs Body Temperature')
+plt.show()
+
+#%%
+# Add constant for VIF calculation
+X_vif = sm.add_constant(X)
+vif = pd.DataFrame()
+vif["feature"] = X_vif.columns
+vif["VIF"] = [variance_inflation_factor(X_vif.values, i) for i in range(X_vif.shape[1])]
+print(vif)
+
+#%%
+train_encoded['Body_Temp_c'] = train_encoded['Body_Temp'] - train_encoded['Body_Temp'].mean()
+train_encoded['Body_Temp_c_sq'] = train_encoded['Body_Temp_c'] ** 2
+X_poly = X.copy()
+X_poly['Body_Temp_c_sq'] = train_encoded['Body_Temp_c_sq']
+
+model_poly = sm.OLS(y, sm.add_constant(X_poly)).fit()
+print(model_poly.summary())
